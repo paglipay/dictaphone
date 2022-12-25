@@ -4,11 +4,12 @@ import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
 import axios from "axios";
-
+import { v4 as uuidv4 } from "uuid";
 const Dictaphone1 = () => {
+  const [consolelog, setConsolelog] = useState("");
   const [message, setMessage] = useState("");
   // const [value, setValue] = useState("");
-  const { speak } = useSpeechSynthesis();
+  const { speak, voices } = useSpeechSynthesis();
   // const wakeup_commands = [
   //   {
   //     command: "computer",
@@ -173,40 +174,40 @@ const Dictaphone1 = () => {
     },
   ];
 
-  const myCallback = async (e) => {
-    setMessage(`Start with the building name. ${e}`);
-    await listenStop();
-    speak({ text: `You said ${e}.` });
-    // axios
-    //   .post(`http://localhost:5000/start/${Number(e)}`, {
-    //     jobs: [
-    //       {
-    //         import: "Key",
-    //       },
-    //       {
-    //         True: `${Number(e) - 1}`,
-    //       },
-    //     ],
-    //   })
-    //   .then((res) => {
-    //     console.log(res);
-    //     console.log(res.data);
-    //     speak({
-    //       text: res.data["Key"].join(" "),
-    //     });
-    //     // if (e < 0) {
-    //     //   const new_cmds = [`${e+1}`].map((e) => {
-    //     //     return createNewCommands(Number(e));
-    //     //   });
-    //     //   setCommands(new_cmds);
-    //     // }
-    //   });
-    // const audio = new Audio("./computerbeep_50.mp3");
-    // await audio.play();
-    // await listenStop();
-    // await speak({ text: "Answer is." });
-    // speak({ text: `You said ${e}.` });
-  };
+  // const myCallback = async (e) => {
+  //   setMessage(`Start with the building name. ${e}`);
+  //   await listenStop();
+  //   speak({ text: `You said ${e}.` });
+  // axios
+  //   .post(`http://localhost:5000/start/${Number(e)}`, {
+  //     jobs: [
+  //       {
+  //         import: "Key",
+  //       },
+  //       {
+  //         True: `${Number(e) - 1}`,
+  //       },
+  //     ],
+  //   })
+  //   .then((res) => {
+  //     console.log(res);
+  //     console.log(res.data);
+  //     speak({
+  //       text: res.data["Key"].join(" "),
+  //     });
+  //     // if (e < 0) {
+  //     //   const new_cmds = [`${e+1}`].map((e) => {
+  //     //     return createNewCommands(Number(e));
+  //     //   });
+  //     //   setCommands(new_cmds);
+  //     // }
+  //   });
+  // const audio = new Audio("./computerbeep_50.mp3");
+  // await audio.play();
+  // await listenStop();
+  // await speak({ text: "Answer is." });
+  // speak({ text: `You said ${e}.` });
+  // };
 
   // const createNewCommands = (e) => {
   //   return {
@@ -217,49 +218,75 @@ const Dictaphone1 = () => {
 
   const [commands, setCommands] = useState([]);
 
-  const start = (e) => {
+  const start = async (e_ary) => {
     // const e = 0;
-    const new_cmds = [`${e}`].map((e) => {
+    const uuid = uuidv4();
+    const new_cmds = await e_ary.map((e) => {
       return {
         command: e,
         callback: async () => {
-          setMessage(`Start with the building name. ${e}`);
-          // await listenStop();
+          if (e === "computer") {
+            const audio = new Audio("./computerbeep_50.mp3");
+            await audio.play();
+          }
+          setMessage(`You said ${e}.`);
           // speak({ text: `${e}.` });
-          axios
-            .post(`http://localhost:5000/start/${Number(e)}`, {
+          await axios
+            .post(`http://localhost:5000/start/${uuid}:${e}`, {
               jobs: [
                 {
                   import: "Key",
                 },
                 {
-                  True: `${Number(e) + 1}`,
+                  False: `${e + 1}`,
+                },
+                {
+                  True: [`./my_packages/VoiceCmdObj/${e}/_create_list.json`],
+                },
+                {
+                  True: [`./my_packages/VoiceCmdObj/${e}/out.json`],
+                },
+                {
+                  False: [`./my_packages/VoiceCmdObj/VoiceCmdObjTest.json`],
                 },
               ],
             })
-            .then((res) => {
+            .then(async (res) => {
               console.log(res);
               // console.log(res.data);
-              speak({
-                text: res.data["Key"].join(" "),
+              // setMessage(res.data["VoiceCmdObj"].join("\n"));
+              await listenStop();
+              await speak({
+                text: res.data["VoiceCmdObj"].join(".\n "),
+                voice: voices[4],
               });
-              if (e < 50) {
-                start(Number(e) + 1);
-              }
+              // await listenContinuously();
+              // if (
+              //   !res.data["VoiceCmdObj"].some(
+              //     (e) => e.command === "turn on Bedroom"
+              //   ) || !res.data["VoiceCmdObj"].some(
+              //     (e) => e.command === "turn off Bedroom"
+              //   )
+              // ) {
+              await start(res.data["VoiceCmdObj"]);
+
+              // }
             });
         },
       };
     });
-    setCommands(new_cmds);
+
+    setCommands(new_cmds.filter((f) => f["command"] !== ""));
   };
 
   // console.log("cmds", cmds);
   useEffect(() => {
-    // start();
+    // start();1
   }, []);
 
   useEffect(() => {
     console.log("commands", commands);
+    setConsolelog(commands.map((e) => e.command).join("\n"));
   }, [commands]);
 
   const {
@@ -284,7 +311,7 @@ const Dictaphone1 = () => {
       "Your browser does not support speech recognition software! Try Chrome desktop, maybe?"
     );
   }
-  const listenContinuously = () => {
+  const listenContinuously = async () => {
     SpeechRecognition.startListening({
       continuous: true,
       language: "en-GB",
@@ -293,6 +320,7 @@ const Dictaphone1 = () => {
   const listenStop = async () => {
     SpeechRecognition.stopListening();
   };
+
   return (
     <div>
       <div>
@@ -301,7 +329,12 @@ const Dictaphone1 = () => {
           <button type="button" onClick={() => start(40)}>
             Start0
           </button>
-          <button type="button" onClick={() => start(1)}>
+          <button
+            type="button"
+            onClick={() => {
+              start(["computer"]);
+            }}
+          >
             Start1
           </button>
           <button type="button" onClick={resetTranscript}>
@@ -314,6 +347,9 @@ const Dictaphone1 = () => {
             Stop
           </button>
         </div>
+      </div>
+      <div>
+        <pre>{consolelog}</pre>
       </div>
       <div>{message}</div>
       <div>
